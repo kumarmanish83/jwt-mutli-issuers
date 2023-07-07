@@ -1,6 +1,6 @@
 # jwt-token-validation-policy-mule4
 
-This policy is dependent on the JWT Validation module: (https://github.com/mulesoft-consulting/jwt-validation-module)
+The actual base reference of the policy is : (https://github.com/mulesoft-consulting/jwt-token-validation-policy-mule4) and is modfied to support the dynamic issuers functionality
 
 Publish your JWT validation module to the same organization that will host Custom Policy.
 Reference the Module in pom.xml
