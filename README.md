@@ -9,7 +9,7 @@ Reference the Module in pom.xml
 <dependency>
 			<groupId>${org_id}</groupId>
 			<artifactId>jwt-validation</artifactId>
-			<version>1.0.12</version>
+			<version>1.0.0</version>
 			<classifier>mule-plugin</classifier>
 </dependency>
 ```
@@ -37,7 +37,7 @@ Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6
 
 ### The policy currently can validate the following fields:
 1. Authorization Header
-2. Issuer
+2. validate dynamic Issuers(upto 2)
 3. Audience
 4. Scopes (scopes need to be provided in a comma separated format, for example: gold, silver)
 5. Expiration (default true)
