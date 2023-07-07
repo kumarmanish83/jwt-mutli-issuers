@@ -1,0 +1,253 @@
+id: jwt-token-validation-policy
+name: JWT Token Validation Policy
+supportedPoliciesVersions: '>=v1'
+description: The custom policy description
+category: Security
+type: custom
+resourceLevelSupported: true
+gatewayCompatibility: '>=4.1.0'
+standalone: true
+violationCategory: authentication
+requiredCharacteristics: []
+providedCharacteristics:
+ - "OAuth 2.0 protected"
+ - Client ID required
+configuration:
+  - description: "Check for client id enforcement"
+    name: "Client Id Validation"
+    propertyName: clientIdValidation
+    type: boolean
+    optional: true
+    defaultValue: false
+    allowMultiple: false
+  - description: "Read Client Id from Claims"
+    name: "ClientId From Claims"
+    propertyName: clientIdFromClaims
+    type: boolean
+    optional: true
+    defaultValue: false
+    allowMultiple: false
+  - propertyName: credentialsOriginHasHttpBasicAuthenticationHeader
+    name: Credentials origin
+    description: Origin of the Client ID and Client Secret credentials.
+    options:
+      - name: HTTP Basic Authentication Header
+        value: httpBasicAuthenticationHeader
+      - name: Custom Expression
+        value: customExpression
+    type: radio
+    defaultValue: customExpression
+    optional: true
+    sensitive: false
+    allowMultiple: false
+  - propertyName: clientIdExpression
+    name: Client ID Expression
+    description: Mule Expression to be used to extract the Client ID from API requests
+    type: expression
+    defaultValue: "#[attributes.headers['client_id']]"
+    optional: true
+    sensitive: false
+    allowMultiple: false
+    dependsOnKey: credentialsOriginHasHttpBasicAuthenticationHeader
+    dependsOnValue: customExpression
+    dependsOnUnfulfilledDefaultValue: "#[attributes.headers['client_id']]"
+  - propertyName: clientSecretExpression
+    name: Client Secret Expression
+    description: Mule Expression to be used to extract the Client Secret from API requests
+    type: expression
+    defaultValue: "#[attributes.headers['client_secret']]"
+    optional: true
+    sensitive: false
+    allowMultiple: false
+    dependsOnKey: credentialsOriginHasHttpBasicAuthenticationHeader
+    dependsOnValue: customExpression
+  - description: "Specifies claims in Dataweave2 Expressions Format"
+    name: "Claims"
+    propertyName: claims
+    sensitive: false
+    type: expression
+    defaultValue: ""
+    allowMultiple: false
+    optional: true
+  - description: "Specifies the expected audience in the JWT. Provide either comma (,) or space( ) separated Audiences"
+    name: "Audience"
+    propertyName: audience
+    sensitive: false
+    type: string
+    allowMultiple: true
+    optional: true
+  - description: "Specifies the expected scopes. Provide either comma (,) or space( ) separated scopes"
+    name: "Scopes"
+    propertyName: scopes
+    sensitive: false
+    type: string
+    allowMultiple: true
+    optional: true
+  - description: "Specifies the 1st issuer of JWT."
+    name: "Issuer1"
+    propertyName: issuer1
+    sensitive: false
+    type: string
+    defaultValue: ""
+  - description: "Specifies the public key of the JWT or set to null to use JWKS service"
+    name: "Secret"
+    propertyName: certificate
+    sensitive: false
+    type: string
+    defaultValue: ""
+    allowMultiple: false
+    optional: true
+  - description: "Specifies the JWKS URL Host of issuer1 to obtain keys for JWT signature verification."
+    name: "JWKS host1"
+    propertyName: keys_host1
+    sensitive: false
+    type: string
+    defaultValue: ""
+    optional: true
+  - description: "Specifies the JWKS URL Path of issuer1 to obtain keys for JWT signature verification."
+    name: "JWKS basepath1"
+    propertyName: keys_base_path1
+    sensitive: false
+    type: string
+    defaultValue: ""
+    optional: true
+  - description: "Specifies the 2nd issuer of JWT."
+    name: "Issuer2"
+    propertyName: issuer2
+    sensitive: false
+    type: string
+    defaultValue: ""
+  - description: "Specifies the JWKS URL Host of issuer2 to obtain keys for JWT signature verification."
+    name: "JWKS host2"
+    propertyName: keys_host2
+    sensitive: false
+    type: string
+    defaultValue: ""
+    optional: true
+  - description: "Specifies the JWKS URL Path of issuer2 to obtain keys for JWT signature verification."
+    name: "JWKS basepath2"
+    propertyName: keys_base_path2
+    sensitive: false
+    type: string
+    defaultValue: ""
+    optional: true
+  - description: "Specifies the JWKS URL to obtain keys for JWT signature verification."
+    name: "JWKS port"
+    propertyName: keys_port
+    sensitive: false
+    type: string
+    defaultValue: ""
+    optional: true
+  - description: "how many keys to cache?"
+    name: "Cache Entries"
+    propertyName: cache_entries
+    sensitive: false
+    type: string
+    defaultValue: "10"
+    optional: true
+  - description: "When should the cache entries expire? Defined in SECONDS"
+    name: "cache TTL"
+    propertyName: cache_ttl
+    sensitive: false
+    type: string
+    defaultValue: "3600"
+    optional: true
+  - description: "How often should TTL be evaluated? Defined in MINUTES"
+    name: "Cache Interval"
+    propertyName: cache_interval
+    sensitive: false
+    type: string
+    defaultValue: "60"
+    optional: true
+  - description: "Verifies that 'exp' claim is present and the token is being consumed before its value."
+    name: "Check Expiration"
+    propertyName: checkExpiration
+    type: boolean
+    optional: true
+    defaultValue: true
+  - description: "Allow tokens with 'alg=none' and no signature."
+    name: "Expiration tolerance"
+    propertyName: expirationTolerance
+    type: int
+    optional: true
+    defaultValue: 0
+    minimumValue: 0
+    maximumValue: 100000000
+  - description: "Verifies that the token is not being consumed before 'nbf' claim only if it is present."
+    name: "Check Not Before"
+    propertyName: checkNotBefore
+    type: boolean
+    optional: true
+    defaultValue: false
+  - description: "Allow tokens with 'alg=none' and no signature."
+    name: "Allow unsecured tokens"
+    propertyName: allowUnsecuredTokens
+    type: boolean
+    optional: true
+    defaultValue: false
+  - description: "Allows policy to cache validated tokens"
+    name: "Cache validated tokens"
+    propertyName: cacheTokens
+    type: boolean
+    optional: true
+    defaultValue: false
+    allowMultiple: false
+  - description: "how many tokens to cache?"
+    name: "Cache Token Entries"
+    propertyName: cache_token_entries
+    sensitive: false
+    type: string
+    defaultValue: "1000"
+    optional: true
+  - description: "When should the cached token entries expire? Defined in SECONDS"
+    name: "cache Token TTL"
+    propertyName: cache_token_ttl
+    sensitive: false
+    type: string
+    defaultValue: "1200"
+    optional: true
+  - description: "How often should TTL be evaluated for cached token? Defined in MINUTES"
+    name: "Cache Token Interval"
+    propertyName: cache_token_interval
+    sensitive: false
+    type: string
+    defaultValue: "30"
+    optional: true
+  - description: In a proxy scenario, defines if headers should be exposed in the request to the backend. The headers that may
+        be sent are the user properties returned by the federation server when validating the access token with a 'X-AGW-' prefix.
+    name: "Expose Headers"
+    propertyName: exposeHeaders
+    type: boolean
+    optional: true
+    defaultValue: true
+
+
+
+
+
+
+
+
+
+ramlV1Snippet: |
+  JWTh based token enforcement policies require a security scheme to be defined in RAML.
+
+  ```
+  headers:
+    Authorization:
+      description: "Used to send a valid OAuth 2 based JWT."
+      type: string
+  responses:
+    401:
+      description: Unauthorised reponses
+      body:
+        application/json:
+          examples:
+            aud-invalid: '{ "error" : "JWT aud is invalid" }'
+            iss-invalid: '{ "error" : "JWT iss is invalid" }'
+            expiry: '{ "error" : "JWT has expired" }'
+            signature-invalid: '{ "error" : "JWT has invalid signature"}'
+            missing-header: '{ "error" : " Authorization header not provided" }'
+            invalid-format: '{ "error" : "Authorization header has invalid format" }'
+    403:
+    ```

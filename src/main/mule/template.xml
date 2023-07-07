@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:jwt-validation="http://www.mulesoft.org/schema/mule/jwt-validation" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:java="http://www.mulesoft.org/schema/mule/java" xmlns:http-policy="http://www.mulesoft.org/schema/mule/http-policy" xmlns:client-id-enforcement="http://www.mulesoft.org/schema/mule/client-id-enforcement"
+	xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:http-transform="http://www.mulesoft.org/schema/mule/http-policy-transform"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+		http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+		http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/jwt-validation http://www.mulesoft.org/schema/mule/jwt-validation/current/mule-jwt-validation.xsd
+		http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+		http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd
+		http://www.mulesoft.org/schema/mule/client-id-enforcement http://www.mulesoft.org/schema/mule/client-id-enforcement/current/mule-client-id-enforcement.xsd
+               http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+               http://www.mulesoft.org/schema/mule/http-policy http://www.mulesoft.org/schema/mule/http-policy/current/mule-http-policy.xsd
+	       http://www.mulesoft.org/schema/mule/http-policy-transform http://www.mulesoft.org/schema/mule/http-policy-transform/current/mule-http-policy-transform.xsd">
+
+	{{#if encrypted}}
+	<secure-properties:config key="${anypoint.platform.encryption_key}" file="${encryptedPropertiesFile}" name="encryptionConfiguration">
+		<secure-properties:encrypt algorithm="AES" mode="CBC" />
+	</secure-properties:config>
+	{{/if}}
+
+	<http:request-config name="HTTP_Request_Configuration" >
+		<http:request-connection usePersistentConnections="false" protocol="HTTPS" host="#[vars.keys_host]" />
+	</http:request-config>
+
+	<client-id-enforcement:config name="clientEnforcementConfig" />
+
+	<os:config name="ObjectStore_Config_Keys"  />
+
+	<os:object-store name="Object_store_jwks_keys" maxEntries="{{ cache_entries }}" entryTtl="{{ cache_ttl }}" expirationInterval="{{ cache_interval }}" persistent="false"
+		config-ref="ObjectStore_Config_Keys" />
+
+	<os:config name="ObjectStore_Config_tokens" />
+
+	<os:object-store name="tokens_object_store" maxEntries="{{ cache_token_entries }}" entryTtl="{{ cache_token_ttl }}" expirationInterval="{{ cache_token_interval }}" persistent="false"
+		config-ref="ObjectStore_Config_tokens" />
+
+	<os:config name="ObjectStore_Config_claims" />
+
+	<os:object-store name="claims_object_store" maxEntries="100000" entryTtl="1200" expirationInterval="30" persistent="false" config-ref="ObjectStore_Config_claims" />
+
+	<http-policy:proxy name="jwt-token-validation">
+		<http-policy:source propagateMessageTransformations="true">
+
+			<!-- <try> <error-handler> </error-handler> </try> -->
+			<try>
+				<set-variable variableName="certificate" value="{{ certificate }}" />
+				<set-variable variableName="issuer1" value="{{ issuer1 }}" />
+				<set-variable variableName="issuer2" value="{{ issuer2 }}" />
+
+				<set-variable variableName="keys_host1" value="{{ keys_host1 }}" />
+				<set-variable variableName="keys_host2" value="{{ keys_host2 }}" />
+
+				<set-variable variableName="keys_base_path1" value="{{ keys_base_path1 }}" />
+				<set-variable variableName="keys_base_path2" value="{{ keys_base_path2 }}" />
+				
+				<set-variable variableName="audience" value="{{ audience }}" />
+				<set-variable variableName="expirationTolerance" value="{{ expirationTolerance }}" />
+				<set-variable variableName="checkExpiration" value="{{ checkExpiration }}" />
+				<set-variable variableName="checkNotBefore" value="{{ checkNotBefore }}" />
+				<set-variable variableName="allowUnsecuredTokens" value="{{ allowUnsecuredTokens }}" />
+				<set-variable variableName="scopes" value="{{ scopes }}" mimeType="text/plain" />
+				<set-variable variableName="claims" value="{{{ claims }}}" mimeType="application/java" />
+				<set-variable variableName="cacheToken" value="{{ cacheToken }}" />
+				<set-variable variableName="exposeHeaders" value="{{ exposeHeaders }}" />
+
+				<set-variable variableName="httpAuthorization" value="#[attributes.headers.authorization default '']" />
+
+				<set-variable variableName="scopes" value="#[vars.scopes]" mimeType="application/java" />
+				<ee:transform>
+					<ee:message>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="scopes"><![CDATA[%dw 2.0
+	output application/java
+	fun removeBrackets(txt) = (txt replace "[" with "") replace "]" with ""
+	fun resolveScopes (str) = if (str contains ",") str splitBy ',' else str splitBy ' '
+
+	---
+	vars.scopes match {
+		case is Null -> []
+		case str: "" -> []
+		case str is String -> resolveScopes(removeBrackets(str))
+		else -> []
+	}
+]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<jwt-validation:create-auth-headers httpAuthorization="#[vars.httpAuthorization]" />
+				
+				<jwt-validation:get-issuer httpAuthorization="#[vars.httpAuthorization]" target="issuer"/>
+				<choice>
+					<when expression="#[(vars.issuer == vars.issuer1)]">
+						<logger level="INFO" message="issuer1 is found" />
+						<set-variable value="#[vars.keys_base_path1]" variableName="keys_base_path" />
+						<set-variable value="#[vars.keys_host1]" variableName="keys_host" />
+						<set-variable value="key1" variableName="keyType" />
+						<set-variable value="certificate1" variableName="certificateType" />
+					</when>
+					<when expression="#[(vars.issuer == vars.issuer2)]">
+						<logger level="INFO" message="issuer2 is found" />
+						<set-variable value="#[vars.keys_base_path2]" variableName="keys_base_path" />
+						<set-variable value="#[vars.keys_host2]" variableName="keys_host" />
+						<set-variable value="key2" variableName="keyType" />
+						<set-variable value="certificate2" variableName="certificateType" />
+					</when>
+					<otherwise>
+						<logger level="INFO" message="No matching issuer is found" />
+						<raise-error type="JWT:NO_ISSUER" description="No Matching issuer is found">
+						</raise-error>
+						
+					</otherwise>
+				</choice>
+					
+
+						<os:contains key="#[vars.certificateType]" objectStore="Object_store_jwks_keys" target="containsCertificate" />
+						<choice>
+							<when expression="#[vars.containsCertificate == true]">
+								<os:retrieve key="#[vars.certificateType]" target="certificate" objectStore="Object_store_jwks_keys" />
+							</when>
+							<when expression="#[isEmpty(vars.certificate) == false]">
+								<os:store key="#[vars.certificateType]" objectStore="Object_store_jwks_keys">
+									<os:value><![CDATA[#[vars.certificate]]]></os:value>
+								</os:store>
+							</when>
+							<otherwise>
+								<os:contains key="#[vars.keyType]" objectStore="Object_store_jwks_keys" target="containsKeys" />
+								<choice>
+									<when expression="#[vars.containsKeys == true]">
+										<os:retrieve key="#[vars.keyType]" objectStore="Object_store_jwks_keys" target="keys" />
+									</when>
+									<otherwise>
+										<http:request method="GET" config-ref="HTTP_Request_Configuration" path="#[vars.keys_base_path]" target="keys" />
+										<logger level="INFO" message="No JSON web key sets found in cache, retriveing JWKS detail from the JWKS URL" />
+
+										<set-variable value="#[vars.keys]" variableName="keys" mimeType="text/plain" />
+										<os:store key="#[vars.keyType]" objectStore="Object_store_jwks_keys">
+											<os:value><![CDATA[#[vars.keys]]]></os:value>
+										</os:store>
+										<logger level="INFO" message="Stored the json web key sets in cache" />
+									</otherwise>
+								</choice>
+								<jwt-validation:create-certificates keys="#[vars.keys as String]" target="certificate" />
+
+								<logger level="INFO" message="Created certificate from the xc5" />
+								
+								<logger level="DEBUG" message="#[vars.certificate.^raw]" />
+								<os:store key="#[vars.certificateType]" objectStore="Object_store_jwks_keys">
+									<os:value><![CDATA[#[vars.certificate]]]></os:value>
+								</os:store>
+								<logger level="INFO" message="Stored the certificate in cache" />
+							</otherwise>
+						</choice>
+						<!-- <set-variable value="#[vars.certificate joinBy(',')]" variableName="certificate"/> -->
+						<!-- <jwt-validation:validate-token expirationTolerance="#[vars.expirationTolerance]" httpAuthorization="#[vars.httpAuthorization]" certificate="#[vars.certificate]" issuer="#[vars.issuer]"
+							audience="#[vars.audience]" checkExpiration="#[vars.checkExpiration as Boolean]" scopes="#[if (isEmpty(vars.scopes) == true) [] else vars.scopes]" checkNotBefore="#[vars.checkNotBefore
+							as Boolean]" allowUnsecuredTokens="#[vars.allowUnsecuredTokens as Boolean]" target="validated" claims="#[if (vars.claims == '') {} else vars.claims]" /> -->
+                         <logger level="INFO" message="Started token inspection flow" />
+						<jwt-validation:inspect-token expirationTolerance="#[vars.expirationTolerance]" httpAuthorization="#[vars.httpAuthorization]"
+							certificate="#[vars.certificate joinBy(',')]" issuer="#[vars.issuer]" audience="#[vars.audience]" checkExpiration="#[vars.checkExpiration as Boolean]"
+							scopes="#[if (isEmpty(vars.scopes) == true) [] else vars.scopes]"
+							checkNotBefore="#[vars.checkNotBefore as Boolean]" allowUnsecuredTokens="#[vars.allowUnsecuredTokens as Boolean]" target="validated"
+							claims="#[if (vars.claims == '') {} else vars.claims]" />
+							<logger level="INFO" message="Completed token inspection flow" />
+
+						<!--<os:store objectStore="claims_object_store" key="#[vars.httpAuthorization]">
+							<os:value><![CDATA[#[if (isEmpty(vars.returnedClaims) == true) [] else vars.returnedClaims]]]></os:value>
+						</os:store> -->
+
+						<!-- <choice> <when expression='#[vars.exposeHeaders == "true"]'> </when> <otherwise> <logger level="INFO" message="Do nothing" /> </otherwise> -->
+
+					<!-- 	<choice>
+							<when expression="#[vars.cacheToken == true]">
+								<os:store key="#[vars.httpAuthorization]" objectStore="tokens_object_store">
+									<os:value><![CDATA[#[vars.validated]]]></os:value>
+								</os:store>
+
+							</when>
+							<otherwise>
+								<logger level="DEBUG" message="Validation Complete" />
+							</otherwise>
+						</choice> -->
+					
+
+				<set-variable variableName="clientIdFromClaims" value="#[vars.validated.cid]" />
+
+				{{#if clientIdValidation}}
+
+				{{#if clientIdFromClaims}}
+				<client-id-enforcement:validate-client-id config-ref="clientEnforcementConfig" clientId="#[vars.clientIdFromClaims]" />
+				{{else if (equals
+				credentialsOriginHasHttpBasicAuthenticationHeader
+				'httpBasicAuthenticationHeader')}}
+				<client-id-enforcement:validate-basic-auth-encoded-client config-ref="clientEnforcementConfig" encodedClient="#[attributes.headers.authorization]" />
+				{{else if clientSecretExpression}}
+				<client-id-enforcement:validate-client config-ref="clientEnforcementConfig" clientId="{{{clientIdExpression}}}" clientSecret="{{{clientSecretExpression}}}" />
+
+				{{else}}
+				<client-id-enforcement:validate-client-id config-ref="clientEnforcementConfig" clientId="{{{clientIdExpression}}}" />
+				{{/if}}
+				{{/if}}
+
+				<logger level="INFO" message="Client Validation Complete" />
+
+				<choice>
+					<when expression="#[(vars.validated is Object) and (isEmpty(vars.validated) == false)]">
+					<logger level="INFO" message="#[vars.validated.^raw]" />
+
+						{{#if exposeHeaders}}
+						<!-- <os:retrieve key="#[vars.httpAuthorization]" target="returnedClaims" objectStore="claims_object_store" /> -->
+						<!-- <http-transform:add-headers outputType="request">
+							<http-transform:headers>
+								#[vars.validated mapObject
+							{("x-agw-" ++ $$):$} as Object {class: "org.mule.runtime.api.util.MultiMap"} ]
+							</http-transform:headers>
+						</http-transform:add-headers> -->
+						<http-policy:execute-next /> 
+						{{/if}}
+					</when>
+					<otherwise>
+						<logger level="INFO" message="Not Validated" />
+						<http-transform:set-response statusCode="401">
+							<http-transform:body>#[
+								{{#if isWsdlEndpoint}}
+								output
+								application/xml
+								--- Soap::clientErrorMessage(payload,
+								'Unauthorized. Access token is missing or invalid')
+								{{else}}
+								output application/json --- {"error": "Unauthorized. Access token is missing or invalid"}
+								{{/if}}
+								]
+							</http-transform:body>
+						</http-transform:set-response>
+					</otherwise>
+				</choice>
+
+				<error-handler>
+					<on-error-continue type="CLIENT-ID-ENFORCEMENT:INVALID_API, CLIENT-ID-ENFORCEMENT:INVALID_CLIENT, CLIENT-ID-ENFORCEMENT:INVALID_CREDENTIALS"
+						logException="false">
+						{{#if isWsdlEndpoint}}
+						<try>
+							<http-transform:set-response statusCode="500">
+								<http-transform:body>#[
+									output application/xml
+									---
+									Soap::clientErrorMessage(payload, 'Unauthorized',
+									'$(error.description)')
+									]
+								</http-transform:body>
+								<http-transform:headers>#[
+									{{#if (equals
+									credentialsOriginHasHttpBasicAuthenticationHeader
+									'httpBasicAuthenticationHeader')}}
+									{'WWW-Authenticate': 'Basic
+									realm="mule-realm"'}
+									{{else}}
+									{'WWW-Authenticate':
+									'Client-ID-Enforcement'}
+									{{/if}}
+									]
+								</http-transform:headers>
+							</http-transform:set-response>
+							<error-handler>
+								<on-error-continue logException="true">
+									<http-transform:set-response statusCode="500">
+										<http-transform:body>#[
+											output application/xml
+											---
+											Soap::soap11ClientErrorMessage('Bad request', 'Problem
+											processing the request payload. Check for
+											parsing errors.')
+											]
+										</http-transform:body>
+									</http-transform:set-response>
+								</on-error-continue>
+							</error-handler>
+						</try>
+						{{else}}
+						<http-transform:set-response statusCode="401">
+							<http-transform:body>#[
+								output application/json
+								---
+								{"error":
+								"$(error.description)"}
+								]
+							</http-transform:body>
+							<http-transform:headers>#[
+								{{#if (equals
+								credentialsOriginHasHttpBasicAuthenticationHeader
+								'httpBasicAuthenticationHeader')}}
+								{'WWW-Authenticate': 'Basic
+								realm="mule-realm"'}
+								{{else}}
+								{'WWW-Authenticate':
+								'Client-ID-Enforcement'}
+								{{/if}}
+								]
+							</http-transform:headers>
+						</http-transform:set-response>
+						{{/if}}
+					</on-error-continue>
+					<on-error-continue type="JWT:NO_ISSUER" logException="true">
+						<http-transform:set-response statusCode="401">
+							<http-transform:body>#[
+								{{#if isWsdlEndpoint}}
+								output
+								application/xml --- Soap::clientErrorMessage(payload,
+								'$(error.description)')
+								{{else}}
+								output application/json ---
+								{"error": "$(error.description)"}
+								{{/if}}
+								]
+							</http-transform:body>
+						</http-transform:set-response>
+					</on-error-continue>
+					<on-error-continue logException="true">
+						<http-transform:set-response statusCode="500">
+							<http-transform:body>#[
+								{{#if isWsdlEndpoint}}
+								output
+								application/xml --- Soap::clientErrorMessage(payload,
+								'$(error.description)')
+								{{else}}
+								output application/json ---
+								{"error": "$(error.description)"}
+								{{/if}}
+								]
+							</http-transform:body>
+						</http-transform:set-response>
+					</on-error-continue>
+
+				</error-handler>
+			</try>
+		</http-policy:source>
+
+		<!-- Expose the Headers - START -->
+		<!-- {{#if exposeHeaders}}
+		<http-policy:operation>
+			 <os:retrieve key="#[vars.httpAuthorization]" target="returnedClaims" objectStore="claims_object_store" />
+			 <http-transform:add-headers outputType="request">
+			 <http-transform:headers>
+				 #[vars.validated mapObject {("X-AGW-" ++ $$):$}]
+			 </http-transform:headers>
+		 </http-transform:add-headers>
+		  <http-policy:execute-next/>
+		</http-policy:operation> {{/if}} -->
+		<!-- Expose the Header - END -->
+	</http-policy:proxy>
+
+</mule>
